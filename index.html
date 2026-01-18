@@ -1,0 +1,791 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chronos: 英语史探索 - 龚凤乾教授设计</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;700&family=Inter:wght@400;600&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .serif { font-family: 'Crimson Pro', serif; }
+        .bilingual-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+        @media (max-width: 768px) { .bilingual-grid { grid-template-columns: 1fr; } }
+        .play-btn { transition: all 0.2s; cursor: pointer; border-radius: 50%; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; background: rgba(59, 130, 246, 0.1); }
+        .play-btn.playing { background: #22c55e; color: white; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+        
+        /* 聊天窗口样式 */
+        .chat-window { box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+        .chat-messages { scrollbar-width: thin; scrollbar-color: #cbd5e1 #f1f5f9; }
+        .chat-messages::-webkit-scrollbar { width: 6px; }
+        .chat-messages::-webkit-scrollbar-track { background: #f1f5f9; }
+        .chat-messages::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        
+        /* 跳动圆点动画 */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 12px 16px;
+        }
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: #64748b;
+            animation: typing-bounce 1.4s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) { animation-delay: 0s; }
+        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes typing-bounce {
+            0%, 60%, 100% { transform: translateY(0); opacity: 0.7; }
+            30% { transform: translateY(-10px); opacity: 1; }
+        }
+        
+        /* 历史记录样式 */
+        .history-item:hover { background-color: #f8fafc; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // 完整的英语史发展阶段数据
+        const ERAS = [
+            { 
+                id: 'proto-germanic', 
+                name: '原始日耳曼语', 
+                enName: 'Proto-Germanic', 
+                year: 'c. 500 BCE - 100 CE', 
+                quickIntro: { 
+                    zh: "英语的远古祖先，日耳曼语族的共同源头，为后来的盎格鲁-撒克逊语奠定基础。", 
+                    en: "The ancient ancestor of English, the common root of Germanic languages, laying foundations for Anglo-Saxon." 
+                },
+                detailedContent: {
+                    zh: "原始日耳曼语是日耳曼语族的假定共同祖先，约在公元前500年至公元100年间使用。这一语言没有书面记录，语言学家通过比较法重构其特征。原始日耳曼语从原始印欧语分化而来，经历了格林定律（Grimm's Law）等重要音变。这一时期的语言特征包括强弱动词系统的形成、名词格变系统（四个格）、以及重音固定在词根音节上的规律。原始日耳曼语最终分化为北日耳曼语（北欧语言）、东日耳曼语（哥特语等）和西日耳曼语（英语、德语、荷兰语等的祖先）三大支系。",
+                    en: "Proto-Germanic is the hypothetical common ancestor of the Germanic languages, spoken approximately from 500 BCE to 100 CE. This language has no written records; linguists reconstruct its features through comparative methods. Proto-Germanic diverged from Proto-Indo-European, undergoing significant sound changes like Grimm's Law. Key features include the formation of strong and weak verb systems, a four-case noun declension system, and stress fixed on root syllables. Proto-Germanic eventually split into North Germanic (Scandinavian languages), East Germanic (Gothic, etc.), and West Germanic (ancestor of English, German, Dutch, etc.)."
+                },
+                sources: [
+                    { name: "Linguistics Society", url: "https://www.linguisticsociety.org" }, 
+                    { name: "Oxford English Dictionary", url: "https://www.oed.com" }
+                ] 
+            },
+            { 
+                id: 'old-english', 
+                name: '古英语', 
+                enName: 'Old English', 
+                year: 'c. 450 - 1150 CE', 
+                quickIntro: { 
+                    zh: "盎格鲁-撒克逊人带来的语言，以《贝奥武夫》为代表，与现代英语差异极大。", 
+                    en: "Language of the Anglo-Saxons, exemplified by Beowulf, vastly different from Modern English." 
+                },
+                detailedContent: {
+                    zh: "古英语是盎格鲁-撒克逊人在公元5世纪入侵不列颠后带来的语言，使用至12世纪中期。古英语属于西日耳曼语支，与现代英语差异巨大，以至于现代英语使用者几乎无法理解。古英语有四种主要方言：诺森布里亚语、麦西亚语、肯特语和西撒克逊语。文学作品以史诗《贝奥武夫》最为著名。古英语保留了复杂的格变系统（主格、属格、与格、宾格），有三个语法性别（阳性、阴性、中性），动词变位也很丰富。词汇大部分来自日耳曼语源，拉丁语借词主要与宗教和学术有关。古英语使用卢恩字母和后来的拉丁字母书写。",
+                    en: "Old English was brought by Anglo-Saxons invading Britain in the 5th century, lasting until the mid-12th century. A West Germanic language, it differs so vastly from Modern English that modern speakers cannot understand it. Old English had four main dialects: Northumbrian, Mercian, Kentish, and West Saxon. The epic Beowulf is its most famous literary work. Old English retained complex case declensions (nominative, genitive, dative, accusative), three grammatical genders (masculine, feminine, neuter), and rich verb conjugations. Most vocabulary was Germanic; Latin loanwords related mainly to religion and learning. It was written in Runic and later Latin scripts."
+                },
+                sources: [
+                    { name: "British Library", url: "https://www.bl.uk/anglo-saxons" },
+                    { name: "Old English Online", url: "https://lrc.la.utexas.edu/eieol/engol" }
+                ] 
+            },
+            { 
+                id: 'middle-english', 
+                name: '中古英语', 
+                enName: 'Middle English', 
+                year: 'c. 1150 - 1500 CE', 
+                quickIntro: { 
+                    zh: "诺曼征服后，法语影响深远，乔叟《坎特伯雷故事集》是这一时期的杰作。", 
+                    en: "After Norman Conquest, French influence was profound; Chaucer's Canterbury Tales exemplifies this era." 
+                },
+                detailedContent: {
+                    zh: "中古英语时期始于1066年诺曼征服后，持续至约1500年。诺曼法语的影响导致英语吸收了大量法语词汇（约10,000个），特别是在法律、政府、艺术和文学领域。这一时期英语的格变系统大幅简化，词序变得更加固定（主-谓-宾），语法性别逐渐消失。中古英语方言众多，包括北部、东米德兰、西米德兰、南部和肯特方言。杰弗里·乔叟（Geoffrey Chaucer）用东米德兰方言创作的《坎特伯雷故事集》（约1387-1400年）成为文学经典。这一时期英语从社会底层语言逐渐恢复到官方和文学语言的地位。元音大推移（Great Vowel Shift）在中古英语晚期开始。",
+                    en: "Middle English began after the Norman Conquest of 1066, lasting until approximately 1500. Norman French influence led to massive vocabulary borrowing (about 10,000 words), especially in law, government, arts, and literature. English case declensions drastically simplified, word order became more fixed (SVO), and grammatical gender gradually disappeared. Middle English had numerous dialects: Northern, East Midlands, West Midlands, Southern, and Kentish. Geoffrey Chaucer's Canterbury Tales (c. 1387-1400) in East Midlands dialect became a literary classic. English gradually recovered from being a lower-class language to official and literary status. The Great Vowel Shift began in late Middle English."
+                },
+                sources: [
+                    { name: "Harvard Chaucer", url: "https://chaucer.fas.harvard.edu" },
+                    { name: "Middle English Compendium", url: "https://quod.lib.umich.edu/m/middle-english-dictionary" }
+                ] 
+            },
+            { 
+                id: 'early-modern', 
+                name: '早期现代英语', 
+                enName: 'Early Modern English', 
+                year: 'c. 1500 - 1700 CE', 
+                quickIntro: { 
+                    zh: "莎士比亚时代的英语，印刷术推广和元音大推移定型了英语面貌。", 
+                    en: "The language of Shakespeare; printing press and Great Vowel Shift shaped English." 
+                },
+                detailedContent: {
+                    zh: "早期现代英语时期（约1500-1700年）见证了英语的重大变革。元音大推移完成，长元音发音发生系统性变化，使中古英语和现代英语的发音差异显著。威廉·卡克斯顿（William Caxton）1476年引入印刷术到英格兰，促进了英语拼写的标准化。威廉·莎士比亚（1564-1616）的戏剧和诗歌创造或普及了数千个英语词汇。詹姆斯一世钦定版《圣经》（King James Bible, 1611）对英语产生了深远影响。这一时期拉丁语和希腊语词汇大量进入英语，尤其在科学、医学和哲学领域。人称代词'thou'开始衰落，'you'成为通用第二人称。语法上，助动词系统进一步发展。",
+                    en: "Early Modern English (c. 1500-1700) witnessed major transformations. The Great Vowel Shift completed, systematically changing long vowel pronunciation, creating significant differences from Middle English. William Caxton introduced the printing press to England in 1476, promoting spelling standardization. William Shakespeare (1564-1616) created or popularized thousands of English words through his plays and poetry. The King James Bible (1611) profoundly influenced English. Latin and Greek vocabulary flooded in, especially in science, medicine, and philosophy. The pronoun 'thou' declined while 'you' became universal second person. Grammatically, the auxiliary verb system further developed."
+                },
+                sources: [
+                    { name: "Folger Shakespeare Library", url: "https://www.folger.edu" },
+                    { name: "Early English Books Online", url: "https://www.proquest.com/products-services/eebo.html" }
+                ] 
+            },
+            { 
+                id: 'late-modern', 
+                name: '晚期现代英语', 
+                enName: 'Late Modern English', 
+                year: 'c. 1700 - 1900 CE', 
+                quickIntro: { 
+                    zh: "工业革命和大英帝国扩张带来词汇爆炸性增长和全球传播。", 
+                    en: "Industrial Revolution and British Empire caused explosive vocabulary growth and global spread." 
+                },
+                detailedContent: {
+                    zh: "晚期现代英语（约1700-1900年）的主要特征是词汇的爆炸性增长。工业革命带来大量科技术语，大英帝国的殖民扩张使英语吸收了来自全球各地的借词，包括印地语（bungalow, jungle）、阿拉伯语（algebra, coffee）和美洲语言（canoe, tomato）。塞缪尔·约翰逊（Samuel Johnson）1755年出版的《英语词典》是第一部综合性英语词典。美式英语在这一时期与英式英语分化，诺亚·韦伯斯特（Noah Webster）1828年的词典确立了美式拼写标准。语法逐渐固定，语法书和用法指南出现。文学方面，简·奥斯汀、查尔斯·狄更斯等作家的作品反映了这一时期的英语风貌。",
+                    en: "Late Modern English (c. 1700-1900) was characterized by explosive vocabulary expansion. The Industrial Revolution introduced numerous technical terms, while British Empire colonization led to borrowings from worldwide: Hindi (bungalow, jungle), Arabic (algebra, coffee), and American languages (canoe, tomato). Samuel Johnson's Dictionary of the English Language (1755) was the first comprehensive English dictionary. American English diverged during this period, with Noah Webster's 1828 dictionary establishing American spelling standards. Grammar became increasingly fixed with grammar books and usage guides emerging. Literary works by Jane Austen, Charles Dickens, and others reflected this era's English."
+                },
+                sources: [
+                    { name: "Johnson's Dictionary Online", url: "https://johnsonsdictionaryonline.com" },
+                    { name: "Victorian Web", url: "http://www.victorianweb.org" }
+                ] 
+            },
+            { 
+                id: 'contemporary', 
+                name: '当代英语', 
+                enName: 'Contemporary English', 
+                year: '1900 CE - Present', 
+                quickIntro: { 
+                    zh: "全球通用语言，受美国影响深远，互联网和科技带来持续演变。", 
+                    en: "Global lingua franca, heavily influenced by America, continuously evolving with internet and technology." 
+                },
+                detailedContent: {
+                    zh: "20世纪至今的当代英语成为真正的全球语言，估计有15亿使用者。美式英语影响力超越英式英语，好莱坞、流行音乐和科技公司推动其传播。两次世界大战后，英语成为国际外交、商业和科学的主要语言。1928年《牛津英语词典》完成。英语变体众多：美式、英式、澳洲、印度、新加坡等各有特色。互联网和社交媒体催生新词汇和表达方式（selfie, emoji, blog）。语言简化趋势明显，非正式语体影响正式语体。全球英语（Global English）概念兴起，强调相互理解而非单一标准。人工智能和机器翻译正在改变英语的使用和学习方式。",
+                    en: "Contemporary English from the 20th century onward has become a truly global language with an estimated 1.5 billion users. American English influence surpassed British English, spread through Hollywood, pop music, and tech companies. After two World Wars, English became the primary language of international diplomacy, business, and science. The Oxford English Dictionary was completed in 1928. English variants abound: American, British, Australian, Indian, Singaporean, each with distinct features. The internet and social media spawned new vocabulary and expressions (selfie, emoji, blog). Language simplification is evident, with informal registers influencing formal ones. The concept of Global English emerged, emphasizing mutual understanding over a single standard. AI and machine translation are transforming how English is used and learned."
+                },
+                sources: [
+                    { name: "Oxford English Dictionary", url: "https://www.oed.com" },
+                    { name: "Merriam-Webster", url: "https://www.merriam-webster.com" }
+                ] 
+            },
+            { 
+                id: 'phonological', 
+                name: '语音演变', 
+                enName: 'Phonological Evolution', 
+                year: 'Across All Periods', 
+                quickIntro: { 
+                    zh: "从原始日耳曼语到现代英语的发音变化，元音大推移是关键转折点。", 
+                    en: "Sound changes from Proto-Germanic to Modern English; Great Vowel Shift was pivotal." 
+                },
+                detailedContent: {
+                    zh: "英语语音系统经历了深刻演变。格林定律（Grimm's Law）解释了原始印欧语到日耳曼语的辅音变化。古英语有丰富的元音系统和复杂的辅音群。最重要的变化是元音大推移（Great Vowel Shift，约1400-1700年），长元音发音系统性上升：/iː/→/aɪ/（如 time），/eː/→/iː/（如 see），/aː/→/eː/（如 name）。这导致英语拼写与发音严重脱节。辅音方面，古英语的摩擦音/x/（如 night 中的 gh）消失。/r/的发音在英式英语中弱化。现代英语有约44个音位（因方言而异），包括20个元音和24个辅音。重音模式从古英语的词根重音演变为更复杂的系统。",
+                    en: "English phonology underwent profound evolution. Grimm's Law explains consonant changes from Proto-Indo-European to Germanic. Old English had a rich vowel system and complex consonant clusters. The most important change was the Great Vowel Shift (c. 1400-1700), where long vowels systematically raised: /iː/→/aɪ/ (time), /eː/→/iː/ (see), /aː/→/eː/ (name). This caused severe spelling-pronunciation mismatches. Consonantally, Old English fricative /x/ (gh in night) disappeared. /r/ weakened in British English. Modern English has approximately 44 phonemes (dialect-dependent), including 20 vowels and 24 consonants. Stress patterns evolved from Old English root stress to more complex systems."
+                },
+                sources: [
+                    { name: "International Phonetic Association", url: "https://www.internationalphoneticassociation.org" },
+                    { name: "Cambridge Phonetics", url: "https://www.phon.cam.ac.uk" }
+                ] 
+            },
+            { 
+                id: 'grammatical', 
+                name: '语法演变', 
+                enName: 'Grammatical Evolution', 
+                year: 'Across All Periods', 
+                quickIntro: { 
+                    zh: "从复杂的格变系统到简化的词序语法，英语语法经历了根本性简化。", 
+                    en: "From complex case systems to simplified word order grammar; English underwent fundamental simplification." 
+                },
+                detailedContent: {
+                    zh: "英语语法经历了从综合型到分析型的转变。古英语有四个格（主格、属格、与格、宾格）、三个语法性别和丰富的动词变位。中古英语时期，格系统崩溃，性别系统消失，词序从相对自由变为固定的主-谓-宾（SVO）结构。名词复数形式简化为主要使用-s后缀。动词系统中，强变化动词（如 sing-sang-sung）数量减少，弱变化动词（加-ed）成为主流。助动词系统发展，形成do-支撑、完成时态（have + 过去分词）和进行时态（be + 现在分词）。否定和疑问句形式规范化。代词系统简化，'thou/thee'消失，'you'统一第二人称。冠词系统从古英语的复杂指示系统简化为定冠词'the'和不定冠词'a/an'。",
+                    en: "English grammar shifted from synthetic to analytic. Old English had four cases (nominative, genitive, dative, accusative), three genders, and rich verb conjugations. During Middle English, the case system collapsed, gender disappeared, and word order changed from relatively free to fixed SVO structure. Noun plurals simplified to mainly -s suffix. In the verb system, strong verbs (sing-sang-sung) declined while weak verbs (add -ed) became dominant. The auxiliary system developed, forming do-support, perfect tenses (have + past participle), and progressive tenses (be + present participle). Negation and question forms standardized. The pronoun system simplified: 'thou/thee' disappeared, 'you' unified second person. The article system simplified from Old English's complex demonstrative system to definite 'the' and indefinite 'a/an'."
+                },
+                sources: [
+                    { name: "Cambridge Grammar of English", url: "https://www.cambridge.org/grammar" },
+                    { name: "English Grammar Society", url: "https://www.englishgrammar.org" }
+                ] 
+            },
+            { 
+                id: 'lexical', 
+                name: '词汇演变', 
+                enName: 'Lexical Evolution', 
+                year: 'Across All Periods', 
+                quickIntro: { 
+                    zh: "从日耳曼核心词汇到吸收全球语言，英语词汇呈现惊人的多样性。", 
+                    en: "From Germanic core to absorbing global languages; English vocabulary shows amazing diversity." 
+                },
+                detailedContent: {
+                    zh: "英语词汇的演变反映了其复杂的历史。古英语词汇主要来自日耳曼语源，保留了基本词汇（如 water, house, mother）。拉丁语借词有三个阶段：大陆时期（wine, cheese）、基督教化时期（altar, bishop）和文艺复兴时期（scientific, library）。诺曼征服带来约10,000个法语词，形成了同义词对：英语词汇多用于日常（begin, help），法语词汇多用于正式（commence, assist）。现代英语从全球数百种语言借词：意大利语（pizza, opera）、西班牙语（siesta, taco）、日语（karaoke, emoji）等。构词法丰富：前缀后缀（unhappiness）、复合词（keyboard）、转化（to google）、缩略语（radar, scuba）。俚语和新词不断涌现，反映社会变化。",
+                    en: "English lexical evolution reflects its complex history. Old English vocabulary mainly came from Germanic sources, retaining basic words (water, house, mother). Latin borrowings occurred in three phases: Continental period (wine, cheese), Christianization period (altar, bishop), and Renaissance period (scientific, library). The Norman Conquest brought about 10,000 French words, creating synonym pairs: English words for everyday use (begin, help), French words for formal contexts (commence, assist). Modern English borrows from hundreds of languages globally: Italian (pizza, opera), Spanish (siesta, taco), Japanese (karaoke, emoji). Rich word formation includes: affixation (unhappiness), compounding (keyboard), conversion (to google), acronyms (radar, scuba). Slang and neologisms constantly emerge, reflecting social changes."
+                },
+                sources: [
+                    { name: "Etymology Online", url: "https://www.etymonline.com" },
+                    { name: "Oxford English Dictionary", url: "https://www.oed.com" }
+                ] 
+            },
+            { 
+                id: 'orthographic', 
+                name: '拼写演变', 
+                enName: 'Orthographic Evolution', 
+                year: 'Across All Periods', 
+                quickIntro: { 
+                    zh: "从表音文字到传统拼写，印刷术和拼写改革塑造了现代英语正字法。", 
+                    en: "From phonemic to traditional spelling; printing and reform efforts shaped modern orthography." 
+                },
+                detailedContent: {
+                    zh: "英语拼写演变从表音到传统。古英语最初使用卢恩字母，后改用拉丁字母并加入特殊字母如þ（thorn）、ð（eth）、ƿ（wynn）。中古英语时期，诺曼抄写员引入法语拼写习惯，如用'qu'代替'cw'（queen）。1476年印刷术引入后，拼写逐渐固定，但元音大推移改变了发音而拼写未变，导致今天的不规则性。塞缪尔·约翰逊（1755年）和诺亚·韦伯斯特（1828年）分别标准化了英式和美式拼写。美式英语简化了部分拼写（color vs. colour, center vs. centre）。现代拼写改革运动尝试但失败。拼写不规则性（如-ough的多种发音）反映英语复杂的历史层次。",
+                    en: "English orthography evolved from phonemic to traditional spelling. Old English initially used Runic alphabet, later switching to Latin with special letters like þ (thorn), ð (eth), and ƿ (wynn). During Middle English, Norman scribes introduced French spelling conventions like 'qu' replacing 'cw' (queen). After printing was introduced in 1476, spelling gradually fixed, but the Great Vowel Shift changed pronunciation while spelling remained, causing today's irregularities. Samuel Johnson (1755) and Noah Webster (1828) standardized British and American spelling. American English simplified some spellings (color vs. colour, center vs. centre). Modern spelling reform movements attempted but failed. Spelling irregularities (like multiple pronunciations of -ough) reflect English's complex historical layers."
+                },
+                sources: [
+                    { name: "Spelling Society", url: "http://www.spellingsociety.org" },
+                    { name: "British Library Scripts", url: "https://www.bl.uk/collection-guides/english-language" }
+                ] 
+            },
+            { 
+                id: 'dialectal', 
+                name: '方言发展', 
+                enName: 'Dialectal Development', 
+                year: 'Across All Periods', 
+                quickIntro: { 
+                    zh: "从古英语四大方言到全球英语变体，方言多样性是英语活力的体现。", 
+                    en: "From Old English's four dialects to global variants; dialectal diversity embodies English vitality." 
+                },
+                detailedContent: {
+                    zh: "英语方言反映了地理和社会差异。古英语有四大方言：诺森布里亚、麦西亚、肯特和西撒克逊（成为标准）。中古英语方言按地理分为北部、东米德兰、西米德兰、南部和肯特方言，乔叟的东米德兰方言后成为标准英语基础。现代英式英语主要方言包括接受发音（RP）、河口英语（Estuary）、苏格兰英语、威尔士英语等。美式英语有东北部、南部、中西部等地区变体。其他主要英语变体包括加拿大、澳大利亚、新西兰、南非、印度、新加坡等英语，各有独特词汇、语法和发音特征。克里奥尔语和混合语（如牙买加克里奥尔、新加坡式英语）展示了英语的适应性。标准英语概念在全球化背景下受到挑战，'世界英语'（World Englishes）研究强调平等对待各种变体。",
+                    en: "English dialects reflect geographical and social differences. Old English had four major dialects: Northumbrian, Mercian, Kentish, and West Saxon (becoming standard). Middle English dialects divided geographically into Northern, East Midlands, West Midlands, Southern, and Kentish; Chaucer's East Midlands became the basis for Standard English. Modern British English dialects include Received Pronunciation (RP), Estuary English, Scottish, Welsh, etc. American English has Northeastern, Southern, Midwestern regional variants. Other major variants include Canadian, Australian, New Zealand, South African, Indian, Singaporean English, each with unique vocabulary, grammar, and pronunciation. Creoles and pidgins (like Jamaican Creole, Singlish) demonstrate English's adaptability. The concept of Standard English is challenged by globalization; 'World Englishes' research emphasizes equal treatment of all variants."
+                },
+                sources: [
+                    { name: "International Dialects of English Archive", url: "https://www.dialectsarchive.com" },
+                    { name: "World Englishes Journal", url: "https://onlinelibrary.wiley.com/journal/1467971x" }
+                ] 
+            },
+            { 
+                id: 'sociolinguistic', 
+                name: '社会语言学视角', 
+                enName: 'Sociolinguistic Perspective', 
+                year: 'Across All Periods', 
+                quickIntro: { 
+                    zh: "英语的社会地位从底层语言上升到全球通用语，反映权力和身份的变迁。", 
+                    en: "English's social status rose from lower-class language to global lingua franca, reflecting power and identity shifts." 
+                },
+                detailedContent: {
+                    zh: "英语的社会地位经历了巨大变化。诺曼征服后200年间，英语是底层民众语言，法语是贵族和宫廷语言，拉丁语是教会和学术语言。14世纪起，英语重获地位，1362年英国议会首次用英语进行。阶级方言在工业革命时期显著，接受发音（RP）成为上层阶级标志。性别语言差异研究显示女性倾向使用标准形式。语域（register）概念区分正式和非正式语言，影响词汇和语法选择。英语作为全球语言（English as a Lingua Franca, ELF）在国际交流中使用，引发关于所有权和规范的讨论。语言政策和规划影响英语在多语社会中的地位。英语在数字时代的使用产生新的交际规范（网络语言）。语言态度研究揭示对不同英语变体的偏见和评价。",
+                    en: "English's social status underwent massive changes. For 200 years after Norman Conquest, English was the lower-class language, French for nobility and court, Latin for church and academia. From the 14th century, English regained status; Parliament first used English in 1362. Class dialects were significant during Industrial Revolution; Received Pronunciation (RP) became an upper-class marker. Gender language difference research shows women tend toward standard forms. The concept of register distinguishes formal and informal language, affecting vocabulary and grammar choices. English as a Lingua Franca (ELF) in international communication raises questions about ownership and norms. Language policy and planning affect English's status in multilingual societies. English use in the digital age creates new communicative norms (internet language). Language attitude research reveals biases and evaluations of different English variants."
+                },
+                sources: [
+                    { name: "Sociolinguistics Society", url: "https://www.linguisticsociety.org/content/what-sociolinguistics" },
+                    { name: "Journal of Sociolinguistics", url: "https://onlinelibrary.wiley.com/journal/14679841" }
+                ] 
+            },
+            { 
+                id: 'future', 
+                name: '未来展望', 
+                enName: 'Future Prospects', 
+                year: '21st Century & Beyond', 
+                quickIntro: { 
+                    zh: "人工智能、全球化和多语社会将如何塑造英语的未来发展。", 
+                    en: "How AI, globalization, and multilingual societies will shape English's future evolution." 
+                },
+                detailedContent: {
+                    zh: "英语的未来发展面临多重趋势。全球化使英语成为国际交流的首选语言,但也产生多样化的'世界英语'变体。技术影响深远：机器翻译和AI助手改变了语言学习和使用方式，语音识别技术促进口语化趋势，社交媒体创造新的语言形式（表情符号、缩写）。简化趋势明显：语法进一步简化，不规则形式减少，词汇借用持续但融合速度更快。多语主义挑战英语的主导地位，一些预测认为英语可能分化为多个相互难以理解的变体。语言维权运动强调保护地方语言和方言。气候变化、移民和数字鸿沟等社会问题将影响语言格局。英语可能演变为多中心语言，不再有单一标准。语言接触将产生更多混合语和克里奥尔语。教育重点可能从标准英语转向交际能力和文化适应性。",
+                    en: "English's future faces multiple trends. Globalization makes English the preferred language for international communication, but also produces diverse 'World Englishes' variants. Technology's impact is profound: machine translation and AI assistants change how language is learned and used, voice recognition promotes colloquialization, social media creates new linguistic forms (emojis, abbreviations). Simplification is evident: further grammatical simplification, fewer irregularities, continued but faster vocabulary borrowing. Multilingualism challenges English dominance; some predict English may fragment into mutually unintelligible variants. Language rights movements emphasize protecting local languages and dialects. Climate change, migration, and digital divides will affect linguistic landscapes. English may evolve into a pluricentric language without a single standard. Language contact will produce more pidgins and creoles. Educational focus may shift from Standard English to communicative competence and cultural adaptability."
+                },
+                sources: [
+                    { name: "Future of English Project", url: "https://www.britishcouncil.org/research-policy-insight/research-reports/future-of-english" },
+                    { name: "Applied Linguistics Journal", url: "https://academic.oup.com/applij" }
+                ] 
+            }
+        ];
+
+        // AI聊天组件 - 包含历史记录功能
+        const ChatWidget = ({ currentEra }) => {
+            const [isOpen, setIsOpen] = useState(false);
+            const [showHistory, setShowHistory] = useState(false);
+            const [conversations, setConversations] = useState(() => {
+                const saved = localStorage.getItem('chatHistory');
+                return saved ? JSON.parse(saved) : [];
+            });
+            const [currentConvId, setCurrentConvId] = useState(null);
+            const [messages, setMessages] = useState([]);
+            const [input, setInput] = useState('');
+            const [isLoading, setIsLoading] = useState(false);
+            const messagesEndRef = useRef(null);
+
+            const scrollToBottom = () => {
+                messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+
+            useEffect(() => {
+                scrollToBottom();
+            }, [messages]);
+
+            // 保存对话历史到 localStorage
+            useEffect(() => {
+                if (conversations.length > 0) {
+                    localStorage.setItem('chatHistory', JSON.stringify(conversations));
+                }
+            }, [conversations]);
+
+            // 创建新对话
+            const startNewConversation = () => {
+                const newConvId = Date.now();
+                setCurrentConvId(newConvId);
+                setMessages([]);
+                setShowHistory(false);
+            };
+
+            // 加载历史对话
+            const loadConversation = (convId) => {
+                const conv = conversations.find(c => c.id === convId);
+                if (conv) {
+                    setCurrentConvId(convId);
+                    setMessages(conv.messages);
+                    setShowHistory(false);
+                }
+            };
+
+            // 删除对话
+            const deleteConversation = (convId) => {
+                setConversations(prev => prev.filter(c => c.id !== convId));
+                if (currentConvId === convId) {
+                    setCurrentConvId(null);
+                    setMessages([]);
+                }
+                // 如果删除后没有对话了，也要清空 localStorage
+                if (conversations.length === 1) {
+                    localStorage.removeItem('chatHistory');
+                }
+            };
+
+            // 清空所有历史
+            const clearAllHistory = () => {
+                if (window.confirm('确定要删除所有对话历史吗？')) {
+                    setConversations([]);
+                    setCurrentConvId(null);
+                    setMessages([]);
+                    localStorage.removeItem('chatHistory');
+                }
+            };
+
+            const sendMessage = async () => {
+                if (!input.trim() || isLoading) return;
+
+                // 如果没有当前对话，创建新对话
+                if (!currentConvId) {
+                    startNewConversation();
+                }
+
+                const userMessage = { role: 'user', content: input };
+                const newMessages = [...messages, userMessage];
+                setMessages(newMessages);
+                setInput('');
+                setIsLoading(true);
+
+                try {
+                    const response = await fetch('/.netlify/functions/chat', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            messages: newMessages,
+                            currentEra: {
+                                name: currentEra.name,
+                                enName: currentEra.enName,
+                                year: currentEra.year
+                            }
+                        })
+                    });
+
+                    const data = await response.json();
+                    
+                    if (response.ok) {
+                        const assistantMessage = {
+                            role: 'assistant',
+                            content: data.message
+                        };
+                        const updatedMessages = [...newMessages, assistantMessage];
+                        setMessages(updatedMessages);
+
+                        // 保存到历史记录
+                        const convId = currentConvId || Date.now();
+                        setConversations(prev => {
+                            const existing = prev.find(c => c.id === convId);
+                            if (existing) {
+                                return prev.map(c => c.id === convId 
+                                    ? { ...c, messages: updatedMessages, updatedAt: new Date().toISOString() }
+                                    : c
+                                );
+                            } else {
+                                return [...prev, {
+                                    id: convId,
+                                    title: userMessage.content.substring(0, 30) + '...',
+                                    messages: updatedMessages,
+                                    eraName: currentEra.name,
+                                    createdAt: new Date().toISOString(),
+                                    updatedAt: new Date().toISOString()
+                                }];
+                            }
+                        });
+                    } else {
+                        throw new Error(data.error || '请求失败');
+                    }
+                } catch (error) {
+                    console.error('Chat error:', error);
+                    setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: '抱歉，我暂时无法回答。请检查网络连接或稍后再试。'
+                    }]);
+                }
+
+                setIsLoading(false);
+            };
+
+            const handleKeyPress = (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            };
+
+            return (
+                <>
+                    {/* 聊天按钮 */}
+                    <button
+                        onClick={() => setIsOpen(!isOpen)}
+                        className="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center justify-center z-50 hover:scale-110"
+                    >
+                        <i className={`fas ${isOpen ? 'fa-times' : 'fa-comments'} text-xl`}></i>
+                    </button>
+
+                    {/* 聊天窗口 */}
+                    {isOpen && (
+                        <div className="fixed bottom-24 right-6 w-96 h-[600px] bg-white rounded-2xl chat-window flex flex-col z-50">
+                            {!showHistory ? (
+                                <>
+                                    {/* 头部 */}
+                                    <div className="bg-blue-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <i className="fas fa-robot text-2xl"></i>
+                                            <div>
+                                                <div className="font-bold">语言史助手</div>
+                                                <div className="text-xs opacity-90">英语历史问答</div>
+                                            </div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setShowHistory(true)}
+                                                className="p-2 hover:bg-blue-700 rounded-lg transition-all"
+                                                title="查看历史"
+                                            >
+                                                <i className="fas fa-history"></i>
+                                            </button>
+                                            <button
+                                                onClick={startNewConversation}
+                                                className="p-2 hover:bg-blue-700 rounded-lg transition-all"
+                                                title="新对话"
+                                            >
+                                                <i className="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {/* 消息区域 */}
+                                    <div className="flex-1 overflow-y-auto p-4 chat-messages">
+                                        {messages.length === 0 && (
+                                            <div className="text-center text-slate-400 mt-8">
+                                                <i className="fas fa-comments text-4xl mb-3"></i>
+                                                <p className="text-sm">您好！我可以帮您解答关于<br/><strong>{currentEra.name}</strong>的问题。</p>
+                                                <p className="text-xs mt-2 text-slate-300">支持中文和英文提问</p>
+                                            </div>
+                                        )}
+                                        {messages.map((msg, idx) => (
+                                            <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+                                                <div className={`inline-block max-w-[80%] p-3 rounded-2xl ${
+                                                    msg.role === 'user' 
+                                                        ? 'bg-blue-600 text-white' 
+                                                        : 'bg-slate-100 text-slate-800'
+                                                }`}>
+                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {isLoading && (
+                                            <div className="text-left mb-3">
+                                                <div className="inline-block bg-slate-100 rounded-2xl">
+                                                    <div className="typing-indicator">
+                                                        <div className="typing-dot"></div>
+                                                        <div className="typing-dot"></div>
+                                                        <div className="typing-dot"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+                                        <div ref={messagesEndRef} />
+                                    </div>
+
+                                    {/* 输入区域 */}
+                                    <div className="p-4 border-t border-slate-200">
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="text"
+                                                value={input}
+                                                onChange={(e) => setInput(e.target.value)}
+                                                onKeyPress={handleKeyPress}
+                                                placeholder="输入您的问题..."
+                                                className="flex-1 px-4 py-2 border border-slate-300 rounded-full focus:outline-none focus:border-blue-500"
+                                                disabled={isLoading}
+                                            />
+                                            <button
+                                                onClick={sendMessage}
+                                                disabled={isLoading || !input.trim()}
+                                                className="w-10 h-10 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                                            >
+                                                <i className="fas fa-paper-plane"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    {/* 历史记录视图 */}
+                                    <div className="bg-blue-600 text-white p-4 rounded-t-2xl flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                            <i className="fas fa-history text-2xl"></i>
+                                            <div className="font-bold">对话历史</div>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            {conversations.length > 0 && (
+                                                <button
+                                                    onClick={clearAllHistory}
+                                                    className="p-2 hover:bg-blue-700 rounded-lg transition-all text-xs"
+                                                    title="清空所有"
+                                                >
+                                                    <i className="fas fa-trash-alt"></i>
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => setShowHistory(false)}
+                                                className="p-2 hover:bg-blue-700 rounded-lg transition-all"
+                                            >
+                                                <i className="fas fa-times"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex-1 overflow-y-auto p-4">
+                                        {conversations.length === 0 ? (
+                                            <div className="text-center text-slate-400 mt-8">
+                                                <i className="fas fa-inbox text-4xl mb-3"></i>
+                                                <p className="text-sm">还没有对话记录</p>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {conversations.slice().reverse().map(conv => (
+                                                    <div
+                                                        key={conv.id}
+                                                        className="p-3 border border-slate-200 rounded-lg hover:border-blue-300 cursor-pointer transition-all history-item flex justify-between items-start"
+                                                    >
+                                                        <div 
+                                                            className="flex-1"
+                                                            onClick={() => loadConversation(conv.id)}
+                                                        >
+                                                            <div className="font-semibold text-sm text-slate-800 truncate">
+                                                                {conv.title}
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                {conv.eraName} • {new Date(conv.createdAt).toLocaleDateString('zh-CN')}
+                                                            </div>
+                                                            <div className="text-xs text-slate-400 mt-1">
+                                                                {conv.messages.length} 条消息
+                                                            </div>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                deleteConversation(conv.id);
+                                                            }}
+                                                            className="ml-2 p-1 text-red-500 hover:bg-red-50 rounded transition-all"
+                                                            title="删除"
+                                                        >
+                                                            <i className="fas fa-trash-alt text-xs"></i>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </>
+            );
+        };
+
+        const App = () => {
+            const [currentEraId, setCurrentEraId] = useState('old-english');
+            const [isLoading, setIsLoading] = useState(false);
+            const [showDetailed, setShowDetailed] = useState(false);
+            const [speaking, setSpeaking] = useState({ zh: false, en: false });
+            const [isSpeechSupported] = useState('speechSynthesis' in window);
+
+            const currentEra = ERAS.find(e => e.id === currentEraId) || ERAS[0];
+            const content = showDetailed ? currentEra.detailedContent : currentEra.quickIntro;
+
+            const getMoreDetails = async () => {
+                if (!showDetailed) {
+                    setIsLoading(true);
+                    setTimeout(() => {
+                        setShowDetailed(true);
+                        setIsLoading(false);
+                    }, 800);
+                }
+            };
+
+            const resetToQuickIntro = () => {
+                setShowDetailed(false);
+            };
+
+            const speak = (text, lang) => {
+                if (!isSpeechSupported) return;
+                
+                if (speaking[lang]) {
+                    window.speechSynthesis.cancel();
+                    setSpeaking(prev => ({ ...prev, [lang]: false }));
+                } else {
+                    window.speechSynthesis.cancel();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = lang === 'zh' ? 'zh-CN' : 'en-US';
+                    utterance.rate = 0.9;
+                    utterance.onstart = () => setSpeaking(prev => ({ ...prev, [lang]: true }));
+                    utterance.onend = () => setSpeaking(prev => ({ ...prev, [lang]: false }));
+                    window.speechSynthesis.speak(utterance);
+                }
+            };
+
+            return (
+                <div className="flex">
+                    <aside className="w-72 bg-slate-900 text-white fixed h-screen overflow-y-auto">
+                        <div className="p-8 border-b border-slate-700">
+                            <h2 className="text-3xl font-black serif mb-2">Chronos</h2>
+                            <p className="text-sm text-slate-400">英语史时代探索</p>
+                            <p className="text-xs text-slate-500 mt-2">龚凤乾教授 设计</p>
+                        </div>
+                        <nav className="p-4">
+                            {ERAS.map(era => (
+                                <button
+                                    key={era.id}
+                                    onClick={() => { setCurrentEraId(era.id); setShowDetailed(false); }}
+                                    className={`w-full text-left p-4 mb-2 rounded-xl transition-all ${
+                                        currentEra.id === era.id
+                                            ? 'bg-blue-600 text-white shadow-lg scale-105'
+                                            : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                                    }`}
+                                >
+                                    <div className="text-sm font-bold">{era.enName}</div>
+                                    <div className="text-[11px] opacity-60">{era.name}</div>
+                                </button>
+                            ))}
+                        </nav>
+                    </aside>
+
+                    <main className="ml-72 flex-1 p-10 bg-white min-h-screen">
+                        <header className="mb-10 flex justify-between items-end border-b pb-8">
+                            <div>
+                                <h1 className="text-5xl font-black serif text-slate-900 mb-2 tracking-tight">{currentEra.enName}</h1>
+                                <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold tracking-tighter">{currentEra.year}</span>
+                            </div>
+                            <div className="flex gap-4">
+                                {showDetailed && (
+                                    <button onClick={resetToQuickIntro} className="flex items-center gap-2 px-6 py-3 rounded-full font-bold bg-slate-200 text-slate-700 hover:bg-slate-300 transition-all active:scale-95">
+                                        <i className="fas fa-history"></i>
+                                        返回简介
+                                    </button>
+                                )}
+                                <button onClick={getMoreDetails} disabled={isLoading} className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all ${isLoading ? 'bg-slate-100 text-slate-400' : 'bg-blue-600 text-white hover:bg-blue-700 shadow-xl active:scale-95'}`}>
+                                    <i className={`fas ${isLoading ? 'fa-circle-notch fa-spin' : 'fa-feather-alt'}`}></i>
+                                    {isLoading ? "语言学家翻阅卷宗..." : showDetailed ? "已获取深度内容" : "获取深度史料解析"}
+                                </button>
+                            </div>
+                        </header>
+
+                        {showDetailed && (
+                            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+                                <div className="flex items-center gap-2 text-green-700">
+                                    <i className="fas fa-check-circle"></i>
+                                    <span className="font-bold">深度内容已加载</span>
+                                    <span className="text-sm">点击"返回简介"按钮查看简短版本</span>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bilingual-grid mb-12">
+                            <div className="p-8 bg-slate-50 rounded-2xl relative border border-slate-100">
+                                <div className="flex justify-between items-center mb-6">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">
+                                        {showDetailed ? "深度解析 (中文)" : "双语简介 (中文)"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {!isSpeechSupported && (
+                                            <span className="text-xs text-red-500">语音不可用</span>
+                                        )}
+                                        <button 
+                                            onClick={() => speak(content.zh, 'zh')} 
+                                            className={`play-btn ${speaking.zh ? 'playing' : ''}`}
+                                            disabled={!isSpeechSupported}
+                                        >
+                                            <i className="fas fa-volume-up text-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-lg leading-relaxed text-slate-800">{content.zh}</p>
+                            </div>
+                            <div className="p-8 bg-blue-50/50 rounded-2xl relative border border-blue-100">
+                                <div className="flex justify-between items-center mb-6">
+                                    <span className="text-[10px] font-bold text-blue-400 uppercase tracking-widest italic">
+                                        {showDetailed ? "In-Depth Analysis (English)" : "Bilingual Context (English)"}
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                        {!isSpeechSupported && (
+                                            <span className="text-xs text-red-500">Voice Unavailable</span>
+                                        )}
+                                        <button 
+                                            onClick={() => speak(content.en, 'en')} 
+                                            className={`play-btn ${speaking.en ? 'playing' : ''}`}
+                                            disabled={!isSpeechSupported}
+                                        >
+                                            <i className="fas fa-volume-up text-lg"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-xl leading-relaxed serif italic text-slate-700">{content.en}</p>
+                            </div>
+                        </div>
+
+                        <section className="bg-slate-50 p-6 rounded-xl border border-dashed border-slate-200">
+                            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 flex items-center gap-2">
+                                <i className="fas fa-landmark"></i> 龚教授推荐：权威参考文献与在线资源
+                            </h3>
+                            <div className="flex flex-wrap gap-3">
+                                {currentEra.sources.map((source, idx) => (
+                                    <a key={idx} href={source.url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-600 hover:border-blue-500 hover:text-blue-600 transition-all hover:shadow-md">
+                                        <i className="fas fa-external-link-alt text-[10px] opacity-40"></i> {source.name}
+                                    </a>
+                                ))}
+                            </div>
+                        </section>
+                    </main>
+
+                    {/* AI聊天组件 */}
+                    <ChatWidget currentEra={currentEra} />
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+
+</html>

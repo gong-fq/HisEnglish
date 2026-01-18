@@ -1,0 +1,22 @@
+{
+  "name": "chronos-english-history",
+  "version": "1.0.0",
+  "description": "英语史探索 - 龚凤乾教授设计",
+  "main": "index.html",
+  "scripts": {
+    "dev": "netlify dev",
+    "build": "echo 'No build step required'",
+    "deploy": "netlify deploy --prod"
+  },
+  "keywords": [
+    "english-language-history",
+    "linguistics",
+    "education",
+    "timeline"
+  ],
+  "author": "龚凤乾教授",
+  "license": "MIT",
+  "devDependencies": {
+    "netlify-cli": "^17.0.0"
+  }
+}

@@ -51,6 +51,23 @@
         
         /* 历史记录样式 */
         .history-item:hover { background-color: #f8fafc; }
+        
+        /* 语音按钮样式 */
+        .message-voice-btn {
+            opacity: 0.7;
+            transition: all 0.2s;
+        }
+        .message-voice-btn:hover {
+            opacity: 1;
+            transform: scale(1.1);
+        }
+        .message-voice-btn.speaking {
+            animation: voice-pulse 1s infinite;
+        }
+        @keyframes voice-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -297,7 +314,7 @@
             }
         ];
 
-        // AI聊天组件 - 包含历史记录功能
+        // AI聊天组件 - 包含历史记录功能和语音朗读
         const ChatWidget = ({ currentEra }) => {
             const [isOpen, setIsOpen] = useState(false);
             const [showHistory, setShowHistory] = useState(false);
@@ -309,6 +326,8 @@
             const [messages, setMessages] = useState([]);
             const [input, setInput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
+            const [speakingMessageId, setSpeakingMessageId] = useState(null);
+            const [isSpeechSupported] = useState('speechSynthesis' in window);
             const messagesEndRef = useRef(null);
 
             const scrollToBottom = () => {
@@ -325,6 +344,43 @@
                     localStorage.setItem('chatHistory', JSON.stringify(conversations));
                 }
             }, [conversations]);
+
+            // 语音朗读功能
+            const speakMessage = (text, messageId) => {
+                if (!isSpeechSupported) return;
+
+                // 如果正在朗读同一条消息，则停止
+                if (speakingMessageId === messageId) {
+                    window.speechSynthesis.cancel();
+                    setSpeakingMessageId(null);
+                    return;
+                }
+
+                // 停止当前朗读
+                window.speechSynthesis.cancel();
+
+                // 检测语言（是否包含中文字符）
+                const isChinese = /[\u4e00-\u9fa5]/.test(text);
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = isChinese ? 'zh-CN' : 'en-US';
+                utterance.rate = 0.9;
+                utterance.pitch = 1;
+                
+                utterance.onstart = () => {
+                    setSpeakingMessageId(messageId);
+                };
+                
+                utterance.onend = () => {
+                    setSpeakingMessageId(null);
+                };
+                
+                utterance.onerror = () => {
+                    setSpeakingMessageId(null);
+                };
+
+                window.speechSynthesis.speak(utterance);
+            };
 
             // 创建新对话
             const startNewConversation = () => {
@@ -497,19 +553,43 @@
                                                 <i className="fas fa-comments text-4xl mb-3"></i>
                                                 <p className="text-sm">您好！我可以帮您解答关于<br/><strong>{currentEra.name}</strong>的问题。</p>
                                                 <p className="text-xs mt-2 text-slate-300">支持中文和英文提问</p>
+                                                {!isSpeechSupported && (
+                                                    <p className="text-xs mt-2 text-red-400">语音功能不可用</p>
+                                                )}
                                             </div>
                                         )}
-                                        {messages.map((msg, idx) => (
-                                            <div key={idx} className={`mb-3 ${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
-                                                <div className={`inline-block max-w-[80%] p-3 rounded-2xl ${
-                                                    msg.role === 'user' 
-                                                        ? 'bg-blue-600 text-white' 
-                                                        : 'bg-slate-100 text-slate-800'
-                                                }`}>
-                                                    <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                                        {messages.map((msg, idx) => {
+                                            const messageId = `msg-${idx}`;
+                                            const isUserMsg = msg.role === 'user';
+                                            const isSpeaking = speakingMessageId === messageId;
+                                            
+                                            return (
+                                                <div key={idx} className={`mb-3 ${isUserMsg ? 'text-right' : 'text-left'}`}>
+                                                    <div className="inline-block max-w-[85%]">
+                                                        <div className={`p-3 rounded-2xl ${
+                                                            isUserMsg 
+                                                                ? 'bg-blue-600 text-white' 
+                                                                : 'bg-slate-100 text-slate-800'
+                                                        }`}>
+                                                            <div className="flex items-start gap-2">
+                                                                <p className="text-sm whitespace-pre-wrap flex-1">{msg.content}</p>
+                                                                {isSpeechSupported && (
+                                                                    <button
+                                                                        onClick={() => speakMessage(msg.content, messageId)}
+                                                                        className={`flex-shrink-0 p-1.5 rounded-lg transition-all hover:bg-opacity-20 hover:bg-white ${
+                                                                            isSpeaking ? 'text-green-500' : ''
+                                                                        }`}
+                                                                        title={isSpeaking ? "停止朗读" : "朗读消息"}
+                                                                    >
+                                                                        <i className={`fas ${isSpeaking ? 'fa-stop-circle' : 'fa-volume-up'} text-sm`}></i>
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            );
+                                        })}
                                         {isLoading && (
                                             <div className="text-left mb-3">
                                                 <div className="inline-block bg-slate-100 rounded-2xl">
